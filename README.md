@@ -1,60 +1,63 @@
 # Ailexity-Work
 
-description for github
+📄 Billing System Module for RECORDS Restaurant Management
+The Billing System Module is a feature-rich, responsive, and user-friendly web-based solution designed to streamline restaurant billing operations. It enables staff to create and manage bills, track order history, generate exports, and print professional receipts. Built as a core module of the RECORDS Restaurant Management System, it integrates seamlessly with other systems like menu and inventory management.
 
-Revert
-Billing System Module
-Overview
-The Billing System is a comprehensive solution for managing restaurant billing operations, order history, and exports. This module provides a user-friendly interface for creating and managing bills, viewing order history, and generating various types of exports.
+✨ Features
+Billing Interface
 
-Features
-1. Billing Interface
-Create and manage restaurant bills
-Add/remove menu items with quantity adjustments
-Customer details management
+Add/remove items with quantity adjustments
+
 Real-time tax calculations (CGST/SGST)
-Multiple payment methods (Cash, Card, UPI)
-Print and save bills
-2. Order History
-View complete order history
-Filter and search past orders
-Detailed view of each order
-Export functionality (PDF/CSV)
-Order analytics and statistics
-3. Export Capabilities
-Generate PDF bills
-Export to CSV for record-keeping
-WhatsApp message generation with formatted billing details
-Print-friendly bill formatting
-Technical Details
-File Structure
+
+Customer details & multiple payment methods (Cash, Card, UPI)
+
+Print and auto-save professional PDF bills
+
+Order History
+
+View and search complete order records
+
+Filter by date, payment mode, or amount
+
+Export detailed order history to PDF/CSV
+
+Order analytics and insights
+
+Export Capabilities
+
+High-quality PDF bill generation using jsPDF
+
+CSV exports using xlsx.js
+
+WhatsApp-friendly formatted message generation
+
+Print-optimized layouts
+
+📁 File Structure
+
 billing-system/
-├── billing.html        # Main billing interface
-├── history.html        # Order history and analytics
-├── export_pdf.js       # PDF generation and export logic
-└── export_handler.js   # Export utilities and handlers
-Dependencies
-jsPDF: For PDF generation
-xlsx: For Excel/CSV exports
-Font Awesome: For icons
-Google Fonts: For typography
-Key Features
-Responsive Design: Works on desktop and tablet devices
-Real-time Calculations: Automatic tax and total calculations
-Data Persistence: Uses localStorage for order history
-Professional Receipts: Well-formatted PDF receipts
-Search & Filter: Easy navigation through order history
-Usage
-Creating a Bill:
-Add items to the order
-Enter customer details
-Apply any discounts
-Process payment
-Print/save the bill
-Viewing History:
-Access order history
-Filter by date, amount, or payment method
-View detailed order information
-Export data as needed
-Integration
-This module is designed to work within the larger RECORDS Restaurant Management System and can be integrated with other modules like menu management and inventory.
+├── billing.html        # Main billing UI
+├── history.html        # Order history and filters
+├── export_pdf.js       # PDF generation logic
+└── export_handler.js   # CSV export & utilities
+🛠️ Tech Stack & Dependencies
+jsPDF – PDF generation
+
+xlsx – CSV/Excel export
+
+Font Awesome – UI icons
+
+Google Fonts – Web typography
+
+localStorage – Data persistence (order history)
+
+🚀 How to Use
+Create Bill: Add items, enter customer details, apply taxes, select payment mode, and print/save bill.
+
+View History: Use the order history panel to search/filter/export previous orders.
+
+Export: Generate professional receipts in PDF/CSV and prepare messages for WhatsApp sharing.
+
+🔗 Integration
+This module is built for easy integration into the full RECORDS Restaurant Management System. It can work independently or be connected to modules like Menu Management or Inventory.
