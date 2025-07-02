@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order History | RECORDS - Restaurant Management</title>
+    <!-- jsPDF with explicit UMD handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        // Initialize jsPDF in a way that works with UMD bundle
+        window.loadJsPDF = function() {
+            return new Promise((resolve) => {
+                // The UMD bundle exposes jspdf as window.jspdf.jsPDF
+                if (window.jspdf?.jsPDF) {
+                    console.log('jsPDF loaded via UMD');
+                    resolve();
+                } 
+                // Fallback for direct global
+                else if (window.jspdf) {
+                    console.log('jsPDF loaded as window.jspdf');
+                    resolve();
+                }
+                // Fallback for older versions
+                else if (window.jsPDF) {
+                    console.log('jsPDF loaded as window.jsPDF');
+                    window.jspdf = { jsPDF: window.jsPDF };
+                    resolve();
+                } else {
+                    console.error('jsPDF not found. Available globals:', 
+                        Object.keys(window).filter(k => 
+                            k.toLowerCase().includes('jspdf') || k === 'jsPDF'
+                        )
+                    );
+                    resolve(); // Still resolve to avoid hanging
+                }
+            });
+        };
+    </script>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .history-container {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Statistics Cards */
+        .history-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card.revenue {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .stat-card.orders {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .stat-card.customers {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .stat-card.avg-order {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* Filter and Search Section */
+        .controls-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .controls-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-btn.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .filter-input, .filter-select {
+            padding: 0.75rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .search-box input {
+            padding-left: 40px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        /* Orders Grid/List */
+        .orders-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .orders-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .orders-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .orders-count {
+            background: rgba(255,255,255,0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        /* Grid View */
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            padding: 1.5rem;
+        }
+
+        .order-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .order-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .order-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .order-card-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 1.25rem;
+            border-bottom: 1px solid #e9ecef;
+            flex-shrink: 0;
+        }
+        
+        .order-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        
+        .order-title > span:first-child {
+            flex-grow: 1;
+        }
+        
+        .order-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .order-status {
+            background: #28a745;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .bill-type {
+            background: #6f42c1;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+        
+        .bill-type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: capitalize;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .bill-type.dine-in, .bill-type-badge.dine-in { 
+            background: #e8e3f7; 
+            color: #5a3d8a; 
+            border: 1px solid #d0c4e9;
+        }
+        .bill-type.takeaway, .bill-type-badge.takeaway { 
+            background: #fff3e6; 
+            color: #cc6600;
+            border: 1px solid #ffd9b3;
+        }
+        .bill-type.delivery, .bill-type-badge.delivery { 
+            background: #e0f7f3; 
+            color: #00705a;
+            border: 1px solid #b2ebf2;
+        }
+        
+        .payment-method, .payment-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            min-width: 70px;
+            text-align: center;
+        }
+        
+        .payment-method.cash, .payment-badge.cash { 
+            background: #e6f7ee; 
+            color: #1d8a5f;
+            border: 1px solid #b8e6d0;
+        }
+        .payment-method.card, .payment-badge.card { 
+            background: #e6f0ff; 
+            color: #0056b3;
+            border: 1px solid #cce0ff;
+        }
+        .payment-method.upi, .payment-badge.upi { 
+            background: #f0e6ff; 
+            color: #5e35b1;
+            border: 1px solid #d9c2ff;
+        }
+        .payment-method.online, .payment-badge.online { 
+            background: #e1f5fe; 
+            color: #0277bd;
+            border: 1px solid #b3e5fc;
+        }
+
+        .order-body {
+            padding: 1.25rem;
+            flex-grow: 1;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        
+        .order-items-list {
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+        
+        .order-items-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .order-items-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .order-items-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        .more-items {
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-align: center;
+            padding: 0.5rem 0;
+            font-style: italic;
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f8f9fa;
+            font-size: 0.9rem;
+        }
+        
+        .item-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 1rem;
+        }
+        
+        .item-quantity {
+            background: #f8f9fa;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        
+        .item-price {
+            font-weight: 600;
+            color: #28a745;
+        }
+
+        .orders-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .orders-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .order-summary {
+            padding: 1.25rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            flex-shrink: 0;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .summary-row.total {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #333;
+            border-top: 1px solid #dee2e6;
+            padding-top: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        /* List View */
+        .orders-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .orders-table th,
+        .orders-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .orders-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .orders-table td {
+            vertical-align: top;
+            padding: 1rem 0.75rem;
+        }
+        
+        .order-row {
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .bill-details {
+            display: none;
+            margin-top: 0.5rem;
+            padding: 1rem;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .order-row.expanded .bill-details {
+            display: block;
+        }
+        
+        .bill-items {
+            margin-bottom: 1rem;
+        }
+        
+        .order-item-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .item-name {
+            flex: 1;
+        }
+        
+        .item-quantity {
+            margin: 0 1rem;
+            color: #6c757d;
+        }
+        
+        .item-price {
+            font-weight: 500;
+            min-width: 70px;
+            text-align: right;
+        }
+        
+        .bill-summary {
+            border-top: 1px dashed #ddd;
+            padding-top: 0.75rem;
+            margin-top: 0.75rem;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .summary-row.total {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #eee;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .bill-number {
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .bill-number:after {
+            content: '▼';
+            font-size: 0.6rem;
+            margin-left: 0.5rem;
+            transition: transform 0.2s;
+        }
+        
+        .order-row.expanded .bill-number:after {
+            transform: rotate(180deg);
+        }
+        
+        .total-amount {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .orders-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .orders-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .orders-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: #6c757d;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin: 2rem 0;
+        }
+        
+        .empty-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+        
+        .empty-state p {
+            font-size: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+        
+        .order-actions {
+            display: flex;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: white;
+            border-top: 1px solid #f1f1f1;
+        }
+        
+        .order-actions .btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .order-actions .btn i {
+            font-size: 0.9em;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-text {
+            font-size: 0.9rem;
+        }
+
+        /* Loading State */
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .history-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .orders-grid {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .controls-header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .history-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .history-container {
+                padding: 1rem;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="top-header">
+        <div class="header-left">
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+            <a href="dashboard.html" class="header-brand">🍽️ RECORDS</a>
+            <nav class="header-nav">
+                <a href="dashboard.html" class="header-nav-item">Dashboard</a>
+                <a href="orders.html" class="header-nav-item">Orders</a>
+                <a href="menu.html" class="header-nav-item">Menu</a>
+                <a href="tables.html" class="header-nav-item">Tables</a>
+                <a href="history.html" class="header-nav-item active">History</a>
+                <a href="feedback.html" class="header-nav-item">Feedback</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div class="header-search">
+                <input type="text" placeholder="Search order history..." id="globalSearch">
+                <span class="header-search-icon">🔍</span>
+            </div>
+            <div class="header-actions">
+                <a href="orders.html" class="header-btn">
+                    <span>📋</span> New Order
+                </a>
+                <div class="header-notifications">
+                    <button class="header-btn">🔔</button>
+                    <span class="notification-badge">3</span>
+                </div>
+                <div class="header-profile" onclick="window.location.href='profile.html'">
+                    <img src="../assets/profile.jpg" alt="Profile" class="header-profile-img">
+                    <div class="header-profile-info">
+                        <div class="header-profile-name">Aalok Nikam</div>
+                        <div class="header-profile-role">Restaurant Manager</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="sidebar"></div>
+        <main class="main-content">
+            <header>
+                <div>
+                    <h2>📚 Order History</h2>
+                    <p>Comprehensive view of completed restaurant orders with analytics</p>
+                </div>
+            </header>
+
+            <div class="history-container">
+                <!-- Statistics Cards -->
+                <section class="history-stats">
+                    <div class="stat-card revenue">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value" id="totalRevenue">$0.00</div>
+                        <div class="stat-label">Total Revenue</div>
+                    </div>
+                    <div class="stat-card orders">
+                        <div class="stat-icon">📋</div>
+                        <div class="stat-value" id="totalOrders">0</div>
+                        <div class="stat-label">Total Orders</div>
+                    </div>
+                    <div class="stat-card customers">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value" id="uniqueCustomers">0</div>
+                        <div class="stat-label">Unique Customers</div>
+                    </div>
+                    <div class="stat-card avg-order">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="avgOrderValue">$0.00</div>
+                        <div class="stat-label">Avg Order Value</div>
+                    </div>
+                </section>
+
+                <!-- Controls Section -->
+                <section class="controls-section">
+                    <div class="controls-header">
+                        <h3 class="controls-title">Filter & Search Orders</h3>
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="grid">
+                                <i class="fas fa-th"></i> Grid
+                            </button>
+                            <button class="view-btn" data-view="list">
+                                <i class="fas fa-list"></i> List
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label class="filter-label">Search Orders</label>
+                            <div class="search-box">
+                                <i class="fas fa-search search-icon"></i>
+                                <input type="text" class="filter-input" id="searchInput" placeholder="Search by table, customer, or items...">
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Date Range</label>
+                            <select class="filter-select" id="dateFilter">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Sort By</label>
+                            <select class="filter-select" id="sortFilter">
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="amount-desc">Highest Amount</option>
+                                <option value="amount-asc">Lowest Amount</option>
+                                <option value="table">Table Number</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Amount Range</label>
+                            <select class="filter-select" id="amountFilter">
+                                <option value="all">All Amounts</option>
+                                <option value="0-25">$0 - $25</option>
+                                <option value="25-50">$25 - $50</option>
+                                <option value="50-100">$50 - $100</option>
+                                <option value="100+">$100+</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-success" id="exportBtn">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                        <button class="btn btn-danger" id="exportPdfBtn">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                        <button class="btn btn-primary" id="refreshBtn" onclick="loadOrderHistory()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Orders Display -->
+                <section class="orders-container">
+                    <div class="orders-header">
+                        <h3 class="orders-title">Order History</h3>
+                        <div class="orders-count" id="ordersCount">0 orders</div>
+                    </div>
+                    
+                    <div id="ordersContent">
+                        <!-- Orders will be displayed here -->
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Bill View Modal -->
+    <div id="billModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Bill Details</h3>
+                <button class="close-btn" onclick="closeBillModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="billModalContent">
+                <!-- Bill content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBillModal()">Close</button>
+                <button class="btn btn-whatsapp" onclick="shareBillViaWhatsApp()">
+                    <i class="fab fa-whatsapp"></i> Share via WhatsApp
+                </button>
+                <button class="btn btn-primary" onclick="printCurrentBill()">
+                    <i class="fas fa-print"></i> Print Bill
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Styles -->
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #billModal, #billModal * {
+                visibility: visible;
+            }
+            #billModal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                border: none;
+            }
+            .modal-content {
+                box-shadow: none;
+                border: none;
+                width: 100%;
+                height: 100%;
+            }
+            .modal-header, .modal-footer {
+                display: none;
+            }
+        }
+
+        /* WhatsApp Button Styles */
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn-whatsapp:hover {
+            background-color: #128C7E;
+        }
+
+        .btn-whatsapp i {
+            margin-right: 5px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+            margin-left: 10px;
+        }
+    </style>
+
+    <!-- Load sidebar -->
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/scripts.js"></script>
+    
+    <script>
+        let allOrders = [];
+        let filteredOrders = [];
+        let currentView = 'grid';
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Load sidebar
+            await loadSidebar();
+            
+            // Initialize the page
+            initializeEventListeners();
+            loadOrderHistory();
+        });
+
+        async function loadSidebar() {
+            try {
+                const response = await fetch('../components/sidebar.html');
+                const sidebarContent = await response.text();
+                document.getElementById('sidebar').innerHTML = sidebarContent;
+
+                // Initialize sidebar functionality
+                initializeSidebar();
+
+                // Set active navigation item
+                const navItems = document.querySelectorAll('.nav-item');
+                navItems.forEach(item => {
+                    if (item.getAttribute('href') === 'history.html') {
+                        item.classList.add('active');
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading sidebar:', error);
+            }
+        }
+
+        // Initialize sidebar functionality (same as other pages)
+        function initializeSidebar() {
+            // Initialize sidebar popup functionality
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(navItem => {
+                const popup = navItem.parentElement.querySelector('.sidebar-popup');
+                if (!popup) return;
+                
+                navItem.addEventListener('mouseenter', function(e) {
+                    const rect = navItem.getBoundingClientRect();
+                    popup.style.top = rect.top + 'px';
+                    popup.classList.add('show');
+                });
+                
+                navItem.addEventListener('mouseleave', function() {
+                    popup.classList.remove('show');
+                });
+            });
+            
+            console.log('Sidebar initialized with popup navigation');
+        }
+
+        function toggleMobileMenu() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('show-mobile');
+        }
+
+        function initializeEventListeners() {
+            // View toggle
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentView = btn.dataset.view;
+                    renderOrders();
+                });
+            });
+
+            // Search and filters
+            document.getElementById('searchInput').addEventListener('input', applyFilters);
+            document.getElementById('dateFilter').addEventListener('change', applyFilters);
+            document.getElementById('sortFilter').addEventListener('change', applyFilters);
+            document.getElementById('amountFilter').addEventListener('change', applyFilters);
+            document.getElementById('globalSearch').addEventListener('input', applyFilters);
+
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                const btn = document.getElementById('refreshBtn');
+                const icon = btn.querySelector('i');
+                
+                icon.style.animation = 'spin 1s linear infinite';
+                setTimeout(() => {
+                    icon.style.animation = '';
+                    loadOrderHistory();
+                }, 1000);
+            });
+
+            // Export button
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+        }
+
+        function loadOrderHistory() {
+            // Show loading
+            document.getElementById('ordersContent').innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            `;
+
+            try {
+                // Load bills from localStorage
+                const savedBills = JSON.parse(localStorage.getItem('bills') || '[]');
+                console.log('Loaded bills from localStorage:', savedBills);
+                
+                // Convert bills to orders format with detailed calculations
+                allOrders = savedBills.map(bill => {
+                    try {
+                        // Ensure items exist and is an array
+                        const items = Array.isArray(bill.items) ? bill.items : [];
+                        
+                        // Calculate values with proper number conversion
+                        const subtotal = parseFloat(bill.subtotal) || items.reduce((sum, item) => {
+                            const price = parseFloat(item.price) || 0;
+                            const quantity = parseInt(item.quantity) || 0;
+                            return sum + (price * quantity);
+                        }, 0);
+                        
+                        const cgst = parseFloat(bill.cgst) || (subtotal * 0.09);  // 9% CGST
+                        const sgst = parseFloat(bill.sgst) || (subtotal * 0.09);  // 9% SGST
+                        const total = parseFloat(bill.totalAmount) || (subtotal + cgst + sgst);
+                        const totalItems = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+                        
+                        // Format date
+                        let billDate;
+                        if (bill.billDate) {
+                            billDate = new Date(bill.billDate);
+                            if (isNaN(billDate.getTime())) {
+                                billDate = new Date();
+                            }
+                        } else {
+                            billDate = new Date();
+                        }
+                        
+                        const formattedDate = billDate.toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+
+                        // Process items
+                        const processedItems = items.map(item => {
+                            // Handle different possible item structures
+                            const itemName = item.name || 
+                                           item.menuItem?.name || 
+                                           item.menuItem || 
+                                           item.itemName || 
+                                           'Unnamed Item';
+                                            
+                            const price = parseFloat(item.price || item.rate || item.unitPrice || 0);
+                            const quantity = parseInt(item.quantity || item.qty || 1);
+                            const itemType = item.type || item.menuItem?.type || 'food';
+                            
+                            return {
+                                menuItem: {
+                                    name: itemName,
+                                    price: price,
+                                    type: itemType
+                                },
+                                quantity: quantity,
+                                price: price,
+                                total: price * quantity,
+                                type: itemType
+                            };
+                        });
+
+                        return {
+                            id: bill.id || `bill-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                            billNumber: bill.billNumber || `BILL-${bill.id ? bill.id.substring(0, 6).toUpperCase() : Date.now().toString().slice(-6)}`,
+                            tableNumber: bill.tableNumber || bill.tableNumber || 'N/A',
+                            customerName: bill.customerName || 'Walk-in Customer',
+                            mobile: bill.mobile || '',
+                            date: formattedDate,
+                            timestamp: bill.timestamp || billDate.getTime(),
+                            items: processedItems,
+                            subtotal: subtotal,
+                            cgst: cgst,
+                            sgst: sgst,
+                            taxRate: 18, // 9% CGST + 9% SGST
+                            taxAmount: cgst + sgst,
+                            totalAmount: total,
+                            paymentMethod: bill.paymentMethod || 'Cash',
+                            paymentStatus: bill.paymentStatus || 'completed',
+                            totalItems: totalItems,
+                            billType: bill.billType || 'dine-in' // dine-in, takeaway, delivery
+                        };
+                    } catch (error) {
+                        console.error('Error processing bill:', bill, error);
+                        return null;
+                    }
+                }).filter(Boolean); // Remove any null entries from errors
+                
+                console.log('Processed orders:', allOrders);
+                
+                // Sort by most recent first
+                allOrders.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                
+                filteredOrders = [...allOrders];
+                updateStatistics();
+                applyFilters();
+                
+            } catch (error) {
+                console.error('Error loading order history:', error);
+                document.getElementById('ordersContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">❌</div>
+                        <h3>Error Loading Bills</h3>
+                        <p>There was an error loading the billing history. Please try refreshing the page.</p>
+                        <p class="error-details">${error.message}</p>
+                    </div>
+                `;
+            }
+            
+            // Sort by most recent first
+            allOrders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            filteredOrders = [...allOrders];
+            updateStatistics();
+            applyFilters();
+        }
+
+        function generateSampleOrders() {
+            const sampleOrders = [];
+            const customers = ['John Smith', 'Jane Doe', 'Mike Johnson', 'Sarah Wilson', 'David Brown', 'Emily Davis'];
+            const menuItems = [
+                { name: 'Grilled Salmon', price: 24.99 },
+                { name: 'Pasta Carbonara', price: 18.50 },
+                { name: 'Caesar Salad', price: 12.99 },
+                { name: 'Beef Steak', price: 32.99 },
+                { name: 'Chicken Burger', price: 16.99 },
+                { name: 'Margherita Pizza', price: 19.99 }
+            ];
+
+            for (let i = 0; i < 20; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - Math.floor(Math.random() * 30));
+                
+                const items = [];
+                const numItems = Math.floor(Math.random() * 4) + 1;
+                
+                for (let j = 0; j < numItems; j++) {
+                    const item = menuItems[Math.floor(Math.random() * menuItems.length)];
+                    const quantity = Math.floor(Math.random() * 3) + 1;
+                    items.push({
+                        menuItem: item,
+                        quantity: quantity,
+                        price: item.price
+                    });
+                }
+
+                const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const taxRate = 10;
+                const taxAmount = subtotal * (taxRate / 100);
+                const totalAmount = subtotal + taxAmount;
+
+                sampleOrders.push({
+                    tableNumber: Math.floor(Math.random() * 20) + 1,
+                    customerName: customers[Math.floor(Math.random() * customers.length)],
+                    items: items,
+                    subtotal: subtotal,
+                    taxRate: taxRate,
+                    taxAmount: taxAmount,
+                    discountRate: 0,
+                    discountAmount: 0,
+                    totalAmount: totalAmount,
+                    date: date.toISOString()
+                });
+            }
+
+            // Save sample data
+            localStorage.setItem('completedOrders', JSON.stringify(sampleOrders));
+            return sampleOrders;
+        }
+
+        function updateStatistics() {
+            // Calculate statistics
+            const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+            const totalOrders = filteredOrders.length;
+            const uniqueCustomers = new Set(filteredOrders.map(order => order.customerName)).size;
+            const totalItems = filteredOrders.reduce((sum, order) => sum + order.totalItems, 0);
+            const totalCGST = filteredOrders.reduce((sum, order) => sum + order.cgst, 0);
+            const totalSGST = filteredOrders.reduce((sum, order) => sum + order.sgst, 0);
+            const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+            
+            // Count by bill type
+            const billTypeCounts = filteredOrders.reduce((acc, order) => {
+                const type = order.billType || 'dine-in';
+                acc[type] = (acc[type] || 0) + 1;
+                return acc;
+            }, {});
+
+            // Format numbers with Indian numbering system
+            const formatNumber = (num, decimals = 2) => {
+                return new Intl.NumberFormat('en-IN', {
+                    maximumFractionDigits: decimals,
+                    minimumFractionDigits: decimals
+                }).format(num);
+            };
+
+            // Update dashboard stats
+            document.getElementById('totalRevenue').textContent = `₹${formatNumber(totalRevenue)}`;
+            document.getElementById('totalOrders').textContent = totalOrders.toLocaleString('en-IN');
+            document.getElementById('uniqueCustomers').textContent = uniqueCustomers.toLocaleString('en-IN');
+            document.getElementById('avgOrderValue').textContent = `₹${formatNumber(avgOrderValue)}`;
+            document.getElementById('ordersCount').textContent = `${totalOrders.toLocaleString('en-IN')} ${totalOrders === 1 ? 'bill' : 'bills'}`;
+            
+            // Update bill type stats if elements exist
+            const billTypeStats = document.getElementById('billTypeStats');
+            if (billTypeStats) {
+                billTypeStats.innerHTML = Object.entries(billTypeCounts)
+                    .map(([type, count]) => `
+                        <div class="bill-type-stat">
+                            <span class="bill-type-label">${type.charAt(0).toUpperCase() + type.slice(1)}:</span>
+                            <span class="bill-type-count">${count}</span>
+                        </div>
+                    `).join('');
+            }
+        }
+
+        function applyFilters() {
+            const searchTerm = (document.getElementById('searchInput').value || document.getElementById('globalSearch').value || '').toLowerCase();
+            const dateFilter = document.getElementById('dateFilter').value;
+            const sortFilter = document.getElementById('sortFilter').value;
+            const amountFilter = document.getElementById('amountFilter').value;
+
+            filteredOrders = allOrders.filter(order => {
+                // Search filter
+                if (searchTerm) {
+                    const searchText = `${order.customerName} ${order.tableNumber} ${order.items.map(item => item.menuItem.name).join(' ')}`.toLowerCase();
+                    if (!searchText.includes(searchTerm)) return false;
+                }
+
+                // Date filter
+                if (dateFilter !== 'all') {
+                    const orderDate = new Date(order.date);
+                    const now = new Date();
+                    
+                    switch (dateFilter) {
+                        case 'today':
+                            if (orderDate.toDateString() !== now.toDateString()) return false;
+                            break;
+                        case 'week':
+                            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            if (orderDate < weekAgo) return false;
+                            break;
+                        case 'month':
+                            if (orderDate.getMonth() !== now.getMonth() || orderDate.getFullYear() !== now.getFullYear()) return false;
+                            break;
+                    }
+                }
+
+                // Amount filter
+                if (amountFilter !== 'all') {
+                    const amount = order.totalAmount;
+                    switch (amountFilter) {
+                        case '0-200':
+                            if (amount > 200) return false;
+                            break;
+                        case '200-500':
+                            if (amount <= 200 || amount > 500) return false;
+                            break;
+                        case '500-1000':
+                            if (amount <= 500 || amount > 1000) return false;
+                            break;
+                        case '1000+':
+                            if (amount <= 1000) return false;
+                            break;
+                    }
+                }
+
+                return true;
+            });
+
+            // Sort orders
+            filteredOrders.sort((a, b) => {
+                switch (sortFilter) {
+                    case 'date-desc':
+                        return new Date(b.date) - new Date(a.date);
+                    case 'date-asc':
+                        return new Date(a.date) - new Date(b.date);
+                    case 'amount-desc':
+                        return b.totalAmount - a.totalAmount;
+                    case 'amount-asc':
+                        return a.totalAmount - b.totalAmount;
+                    case 'table':
+                        return a.tableNumber - b.tableNumber;
+                    default:
+                        return 0;
+                }
+            });
+
+            renderOrders();
+        }
+
+        function renderOrders() {
+            const ordersContent = document.getElementById('ordersContent');
+            const ordersCount = document.getElementById('ordersCount');
+            
+            ordersCount.textContent = `${filteredOrders.length} order${filteredOrders.length !== 1 ? 's' : ''}`;
+
+            if (filteredOrders.length === 0) {
+                ordersContent.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <div class="empty-title">No Orders Found</div>
+                        <div class="empty-text">Try adjusting your filters or search terms</div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (currentView === 'grid') {
+                renderGridView(ordersContent);
+            } else {
+                renderListView(ordersContent);
+            }
+        }
+
+        function renderGridView(container) {
+            const ordersGrid = document.createElement('div');
+            ordersGrid.className = 'orders-grid';
+
+            if (filteredOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <h3>No Bills Found</h3>
+                        <p>No billing history available. Bills will appear here after they are created.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredOrders.forEach(order => {
+                const orderCard = document.createElement('div');
+                orderCard.className = 'order-card';
+                
+                // Format date
+                const billDate = new Date(order.date);
+                const formattedDate = billDate.toLocaleString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+
+                // Generate items list (show only first 3 items with "+X more" if more exist)
+                const maxItemsToShow = 3;
+                const itemsToShow = order.items.slice(0, maxItemsToShow);
+                const remainingItems = order.items.length - maxItemsToShow;
+                
+                const itemsHtml = itemsToShow.map(item => {
+                    const unitPrice = item.price && parseFloat(item.price) > 0
+                        ? parseFloat(item.price)
+                        : (order.subtotal / order.items.reduce((sum, i) => sum + parseFloat(i.quantity), 0));
+                    const totalPrice = unitPrice * item.quantity;
+                    return `
+                        <div class="order-item">
+                            <span class="item-name">${item.menuItem?.name || item.name || 'Item'}</span>
+                            <span class="item-quantity">x${item.quantity}</span>
+                            <span class="item-price">₹${totalPrice.toFixed(2)}</span>
+                        </div>`;
+                }).join('');
+
+                // Calculate values if not properly set
+                const subtotal = order.subtotal || order.items.reduce((sum, item) => {
+                    const price = parseFloat(item.price || item.menuItem?.price || 0);
+                    const quantity = parseInt(item.quantity) || 1;
+                    return sum + (price * quantity);
+                }, 0);
+                
+                // Calculate CGST and SGST (9% each if not set)
+                const cgst = order.cgst || (subtotal * 0.09);
+                const sgst = order.sgst || (subtotal * 0.09);
+                const taxAmount = cgst + sgst;
+                
+                // Calculate total (use existing total if it makes sense, otherwise calculate)
+                let total = parseFloat(order.totalAmount);
+                if (isNaN(total) || total <= 0) {
+                    total = subtotal + taxAmount;
+                }
+                
+                orderCard.innerHTML = `
+                    <div class="order-card-header">
+                        <div class="order-title">
+                            <div class="bill-number">${order.billNumber || (order.id ? `BILL${order.id.substring(0, 12)}` : 'N/A')}</div>
+                            <span class="bill-type ${order.billType || 'dine-in'}">${(order.billType || 'Dine-in').toUpperCase()}</span>
+                        </div>
+                        <div class="order-meta">
+                            <span>${order.customerName || 'Guest'}</span>
+                            <span class="order-status">${order.paymentStatus || 'Completed'}</span>
+                        </div>
+                        <div class="order-date">${formattedDate}</div>
+                    </div>
+                    <div class="order-body">
+                        <div class="order-items-list">
+                            ${itemsHtml}
+                            ${remainingItems > 0 ? `
+                                <div class="more-items">+${remainingItems} more item${remainingItems > 1 ? 's' : ''}</div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="order-summary">
+                        <div class="summary-row">
+                            <span>Items (${order.totalItems || order.items.length}):</span>
+                            <span>₹${subtotal.toFixed(2)}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>CGST (9%):</span>
+                            <span>₹${cgst.toFixed(2)}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>SGST (9%):</span>
+                            <span>₹${sgst.toFixed(2)}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Payment:</span>
+                            <span class="payment-method ${(order.paymentMethod || '').toLowerCase()}">
+                                ${order.paymentMethod === 'CASH' ? '💵' : 
+                                  order.paymentMethod === 'UPI' ? '📱' : 
+                                  order.paymentMethod === 'CARD' ? '💳' : '🔗'}
+                                ${order.paymentMethod || 'CASH'}
+                            </span>
+                        </div>
+                        <div class="summary-row total">
+                            <strong>Total:</strong>
+                            <strong>₹${total.toFixed(2)}</strong>
+                        </div>
+                    </div>
+                    <div class="order-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.openBillModal('${order.id}')">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.printBill('${order.id}')">
+                            <i class="fas fa-print"></i> Print
+                        </button>
+                    </div>
+                `;
+
+                ordersGrid.appendChild(orderCard);
+            });
+
+
+            container.innerHTML = '';
+            container.appendChild(ordersGrid);
+        }
+
+        function renderListView(container) {
+            const table = document.createElement('table');
+            table.className = 'orders-table';
+
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>BILL #</th>
+                        <th>CUSTOMER</th>
+                        <th>TABLE</th>
+                        <th>ITEMS</th>
+                        <th>TYPE</th>
+                        <th>PAYMENT</th>
+                        <th>DATE & TIME</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredOrders.map(order => {
+                        // Format items list with quantities and prices
+                        const itemsList = order.items.map(item => {
+                            const unitPrice = item.price && parseFloat(item.price) > 0
+                                ? parseFloat(item.price)
+                                : (order.subtotal / order.items.reduce((sum, i) => sum + parseFloat(i.quantity), 0));
+                            const totalPrice = unitPrice * item.quantity;
+                            return `<div class="order-item-detail">
+                                <span class="item-name">${item.menuItem?.name || item.name || 'Item'}</span>
+                                <span class="item-quantity">x${item.quantity}</span>
+                                <span class="item-price">₹${totalPrice.toFixed(2)}</span>
+                            </div>`;
+                        }).join('');
+                        
+                        // Calculate CGST and SGST (9% each)
+                        const cgst = order.cgst || (order.subtotal * 0.09);
+                        const sgst = order.sgst || (order.subtotal * 0.09);
+                        
+                        const itemRate = order.subtotal / order.items.reduce((sum, i) => sum + parseFloat(i.quantity), 1);
+                        const total = order.totalItems * itemRate;
+                        const formattedDate = new Date(order.date || order.billDate).toLocaleString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                        
+                        return `
+                        <tr class="order-row">
+                            <td>${order.billNumber || (order.id ? `BILL${order.id.substring(0, 12)}` : 'N/A')}</td>
+                            <td>${order.customerName?.toLowerCase() || 'N/A'}</td>
+                            <td>${order.tableNumber || 'N/A'}</td>
+                            <td>${order.totalItems} ${order.totalItems === 1 ? 'item' : 'items'}</td>
+                            <td>${order.paymentStatus === 'paid' ? 'paid' : 'pending'}</td>
+                            <td>${(order.paymentMethod || 'CASH').toUpperCase()}</td>
+                            <td>${formattedDate}</td>
+                            <td>₹${total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            `;
+
+            container.innerHTML = '';
+            container.appendChild(table);
+            
+            // Add click handler to toggle bill details
+            const rows = container.querySelectorAll('.order-row');
+            rows.forEach(row => {
+                const billNumber = row.querySelector('.bill-number');
+                if (billNumber) {
+                    billNumber.addEventListener('click', () => {
+                        row.classList.toggle('expanded');
+                    });
+                }
+            });
+        }
+
+        function exportData() {
+            if (!filteredOrders || filteredOrders.length === 0) {
+                alert('No orders to export');
+                return;
+            }
+            
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + "Bill No,Table,Customer,Date,Items,Subtotal,Tax,Total,Status\n"
+                + filteredOrders.map(order => {
+                    const items = order.items.map(item => `${item.name || item.menuItem?.name || 'Item'} (x${item.quantity})`).join('; ');
+                    const date = order.date ? new Date(order.date).toLocaleDateString('en-GB') : 'N/A';
+                    return `"${order.id || 'N/A'}","${order.tableNumber || 'N/A'}","${order.customerName || 'Walk-in'}","${date}","${items}",${(order.subtotal || 0).toFixed(2)},${(order.taxAmount || 0).toFixed(2)},${(order.total || order.totalAmount || 0).toFixed(2)},"${order.paymentStatus || 'pending'}"`;
+                }).join("\n");
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `order_history_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function exportToPDF() {
+            if (!filteredOrders || filteredOrders.length === 0) {
+                alert('No orders to export');
+                return;
+            }
+            
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+                
+                // Set default font
+                doc.setFont('helvetica');
+                
+                // Page dimensions
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const margin = 10;
+                const contentWidth = pageWidth - (margin * 2);
+                
+                // Add title
+                doc.setFontSize(20);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(44, 62, 80); // Dark blue-gray
+                doc.text('ORDER HISTORY REPORT', pageWidth / 2, 15, { align: 'center' });
+                
+                // Add subtitle
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Generated on: ${new Date().toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })}`, pageWidth - margin, 15, { align: 'right' });
+                
+                // Add summary section
+                doc.setFillColor(240, 248, 255); // Light blue
+                doc.rect(margin, 25, contentWidth, 15, 'F');
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text('SUMMARY', margin + 5, 35);
+                
+                // Calculate summary
+                const totalOrders = filteredOrders.length;
+                const totalRevenue = filteredOrders.reduce((sum, order) => sum + (parseFloat(order.total) || parseFloat(order.totalAmount) || 0), 0);
+                const paidOrders = filteredOrders.filter(order => order.paymentStatus === 'paid').length;
+                const pendingOrders = totalOrders - paidOrders;
+                
+                // Add summary boxes
+                const boxWidth = (contentWidth - 20) / 4;
+                const boxY = 45;
+                
+                // Total Orders
+                doc.setFillColor(52, 152, 219); // Blue
+                doc.roundedRect(margin, boxY, boxWidth, 25, 3, 3, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(10);
+                doc.text('TOTAL ORDERS', margin + 5, boxY + 8);
+                doc.setFontSize(14);
+                doc.text(totalOrders.toString(), margin + 5, boxY + 18);
+                
+                // Total Revenue
+                doc.setFillColor(46, 204, 113); // Green
+                doc.roundedRect(margin + boxWidth + 5, boxY, boxWidth, 25, 3, 3, 'F');
+                doc.text('TOTAL REVENUE', margin + boxWidth + 10, boxY + 8);
+                doc.setFontSize(12);
+                doc.text(`₹${totalRevenue.toFixed(2)}`, margin + boxWidth + 10, boxY + 20);
+                
+                // Paid Orders
+                doc.setFillColor(155, 89, 182); // Purple
+                doc.roundedRect(margin + (boxWidth * 2) + 10, boxY, boxWidth, 25, 3, 3, 'F');
+                doc.text('PAID ORDERS', margin + (boxWidth * 2) + 15, boxY + 8);
+                doc.setFontSize(14);
+                doc.text(paidOrders.toString(), margin + (boxWidth * 2) + 15, boxY + 20);
+                
+                // Pending Orders
+                doc.setFillColor(230, 126, 34); // Orange
+                doc.roundedRect(margin + (boxWidth * 3) + 15, boxY, boxWidth, 25, 3, 3, 'F');
+                doc.text('PENDING ORDERS', margin + (boxWidth * 3) + 20, boxY + 8);
+                doc.setFontSize(14);
+                doc.text(pendingOrders.toString(), margin + (boxWidth * 3) + 20, boxY + 20);
+                
+                // Reset text color
+                doc.setTextColor(0, 0, 0);
+                
+                // Add orders table
+                let y = 85;
+                
+                // Table header
+                doc.setFillColor(52, 73, 94); // Dark blue
+                doc.rect(margin, y, contentWidth, 10, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(10);
+                doc.text('Bill #', margin + 3, y + 7);
+                doc.text('Date', margin + 25, y + 7);
+                doc.text('Customer', margin + 55, y + 7);
+                doc.text('Table', margin + 100, y + 7);
+                doc.text('Items', margin + 120, y + 7);
+                doc.text('Amount', margin + 180, y + 7, { align: 'right' });
+                doc.text('Status', margin + contentWidth - 15, y + 7);
+                
+                // Table rows
+                doc.setTextColor(0, 0, 0);
+                y += 10;
+                
+                filteredOrders.forEach((order, index) => {
+                    if (y > doc.internal.pageSize.getHeight() - 20) {
+                        doc.addPage();
+                        y = 20;
+                        // Add header on new page
+                        doc.setFontSize(20);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('ORDER HISTORY REPORT (Continued)', pageWidth / 2, 15, { align: 'center' });
+                        y = 30;
+                    }
+                    
+                    // Alternate row colors
+                    if (index % 2 === 0) {
+                        doc.setFillColor(245, 245, 245);
+                    } else {
+                        doc.setFillColor(255, 255, 255);
+                    }
+                    doc.rect(margin, y, contentWidth, 15, 'F');
+                    
+                    // Bill number
+                    doc.setFontSize(9);
+                    doc.text(order.id || 'N/A', margin + 3, y + 5);
+                    
+                    // Date
+                    const orderDate = order.date ? new Date(order.date) : new Date();
+                    doc.text(orderDate.toLocaleDateString('en-GB'), margin + 25, y + 5);
+                    
+                    // Customer
+                    doc.text(order.customerName || 'Walk-in', margin + 55, y + 5);
+                    
+                    // Table
+                    doc.text(order.tableNumber || 'N/A', margin + 100, y + 5);
+                    
+                    // Items (truncate if too long)
+                    const items = order.items.map(item => 
+                        `${item.name || item.menuItem?.name || 'Item'} (x${item.quantity})`
+                    ).join(', ');
+                    doc.text(doc.splitTextToSize(items, 50), margin + 120, y + 5);
+                    
+                    // Amount
+                    doc.text(`₹${(order.total || order.totalAmount || 0).toFixed(2)}`, margin + contentWidth - 25, y + 5, { align: 'right' });
+                    
+                    // Status
+                    const status = (order.paymentStatus || 'pending').toLowerCase();
+                    if (status === 'paid') {
+                        doc.setTextColor(39, 174, 96); // Green
+                    } else {
+                        doc.setTextColor(231, 76, 60); // Red
+                    }
+                    doc.text(status.charAt(0).toUpperCase() + status.slice(1), margin + contentWidth - 15, y + 5);
+                    doc.setTextColor(0, 0, 0); // Reset color
+                    
+                    y += 15;
+                });
+                
+                // Add footer
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text('© Restaurant Management System', pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+                
+                // Save the PDF
+                doc.save(`Order_History_${new Date().toISOString().split('T')[0]}.pdf`);
+                
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                alert('Error generating PDF. Please try again.');
+            }
+        }
+    </script>
+
+    <script>
+        // Global variable to store current bill being viewed
+        let currentBill = null;
+
+        // Share bill via WhatsApp
+        function shareBillViaWhatsApp() {
+            if (!currentBill) return;
+            
+            // Extract bill details
+            const customerName = currentBill.customerName || 'Valued Customer';
+            const restaurantName = document.querySelector('.logo')?.textContent || 'Our Restaurant';
+            // Fix the final amount display by ensuring it's a proper number
+            const totalAmountValue = typeof currentBill.totalAmount === 'number' ? currentBill.totalAmount : parseFloat(currentBill.totalAmount || currentBill.total || 0);
+            const paymentMode = currentBill.paymentMethod || currentBill.paymentMode || 'Cash';
+            const dateTime = currentBill.date || new Date().toLocaleString();
+            const mobileNumber = currentBill.mobile || currentBill.mobileNumber || '';
+            
+            // Format the message
+            const message = `Hi ${customerName}, thank you for dining with us at ${restaurantName}! 😊\n\n` +
+                          `We appreciate your visit and hope you had a wonderful experience.\n\n` +
+                          `🧾 Total Amount Paid: ₹${totalAmountValue.toFixed(2)}\n` +
+                          `💳 Payment Mode: ${paymentMode}\n` +
+                          `📅 Date & Time: ${dateTime}\n\n` +
+                          `If you have any feedback, feel free to reply—we'd love to hear from you!\n` +
+                          `Looking forward to serving you again soon. 🍽\n\n` +
+                          `Powered by Ailexity Tech Pvt Ltd\n` +
+                          `– Team ${restaurantName}`;
+            
+            // Encode the message for URL
+            const encodedMessage = encodeURIComponent(message);
+            
+            // Check if mobile number exists and is valid
+            if (mobileNumber && /^\d{10}$/.test(mobileNumber)) {
+                // Open WhatsApp with the message to the specific number
+                window.open(`https://wa.me/91${mobileNumber}?text=${encodedMessage}`, '_blank');
+                console.log(`Sending WhatsApp message to: ${mobileNumber}`);
+            } else {
+                // Fallback to general sharing without a specific number
+                window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+                console.log('No valid mobile number found, using general WhatsApp share');
+            }
+        }
+
+        // Open bill modal with details
+        function openBillModal(billId) {
+            const bill = allOrders.find(b => b.id === billId);
+            if (!bill) return;
+
+            currentBill = bill;
+            const modal = document.getElementById('billModal');
+            const content = document.getElementById('billModalContent');
+
+            // Calculate price per item based on subtotal if needed
+            const calculateItemPrice = (item, subtotal, items) => {
+                // If price is already set and valid, use it
+                if (item.price && parseFloat(item.price) > 0) {
+                    return parseFloat(item.price);
+                }
+                
+                // If this is the only item, use the subtotal divided by quantity
+                if (items.length === 1) {
+                    return subtotal / item.quantity;
+                }
+                
+                // Otherwise calculate based on subtotal and quantity proportion
+                const totalQuantity = items.reduce((sum, i) => sum + parseFloat(i.quantity), 0);
+                const itemProportion = item.quantity / totalQuantity;
+                return (subtotal * itemProportion) / item.quantity;
+            };
+            
+            // Format bill items with calculated prices
+            const itemsHtml = bill.items.map((item, index) => {
+                // Safely get item name with fallbacks
+                const itemName = item.menuItem?.name || 
+                                item.name || 
+                                item.menuItemName || 
+                                `Item ${index + 1}`;
+                
+                // Get price with fallback to calculated price
+                const itemPrice = parseFloat(item.price) > 0 ? 
+                                parseFloat(item.price) : 
+                                (bill.subtotal / bill.items.reduce((sum, i) => sum + parseFloat(i.quantity), 0));
+                
+                const itemTotal = itemPrice * item.quantity;
+                
+                return `
+                    <tr>
+                        <td>${itemName}</td>
+                        <td class="text-center">${item.quantity}</td>
+                        <td class="text-right">₹${itemPrice.toFixed(2)}</td>
+                        <td class="text-right">₹${itemTotal.toFixed(2)}</td>
+                    </tr>`;
+            }).join('');
+
+            // Format bill content
+            content.innerHTML = `
+                <div class="bill-header">
+                    <h2>${bill.billNumber}</h2>
+                    <div class="bill-meta">
+                        <div><strong>Date:</strong> ${bill.date}</div>
+                        <div><strong>Customer:</strong> ${bill.customerName}</div>
+                        ${bill.tableNumber !== 'N/A' ? `<div><strong>Table:</strong> ${bill.tableNumber}</div>` : ''}
+                        <div><strong>Type:</strong> <span class="bill-type ${bill.billType || 'dine-in'}">${(bill.billType || 'Dine-in').toUpperCase()}</span></div>
+                    </div>
+                </div>
+                
+                <div class="bill-items">
+                    <table class="bill-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-right">Price</th>
+                                <th class="text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="bill-summary">
+                    <div class="summary-row">
+                        <span>Subtotal (${bill.totalItems} ${bill.totalItems === 1 ? 'item' : 'items'}):</span>
+                        <span>₹${bill.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>CGST (9%):</span>
+                        <span>₹${bill.cgst.toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>SGST (9%):</span>
+                        <span>₹${bill.sgst.toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total Amount:</span>
+                        <span>₹${bill.totalAmount.toFixed(2)}</span>
+                    </div>
+                    <div class="payment-info">
+                        <div class="payment-method-display">
+                            <strong>Payment Method:</strong> 
+                            <span class="payment-method ${bill.paymentMethod?.toLowerCase() || 'cash'}">
+                                ${bill.paymentMethod === 'CASH' ? '💵 Cash' : 
+                                  bill.paymentMethod === 'UPI' ? '📱 UPI' : 
+                                  bill.paymentMethod === 'CARD' ? '💳 Card' : '🔗 Other'}
+                            </span>
+                        </div>
+                        <div class="payment-status-display">
+                            <strong>Status:</strong> 
+                            <span class="payment-status ${bill.paymentStatus || 'paid'}">
+                                ${bill.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Pending'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <style>
+                    /* Ensure all text in modal is black */
+                    .modal-content {
+                        color: #000 !important;
+                    }
+                    
+                    /* Style specific elements */
+                    .bill-header {
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                        color: #000 !important;
+                    }
+                    .bill-header h2 {
+                        margin: 0 0 10px 0;
+                        color: #2c3e50;
+                    }
+                    .bill-meta {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                        gap: 10px;
+                        color: #666;
+                        font-size: 0.9em;
+                    }
+                    .bill-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 20px 0;
+                        table-layout: fixed;
+                    }
+                    .bill-table td:first-child {
+                        width: 50%;
+                        word-break: break-word;
+                    }
+                    .bill-table th, .bill-table td {
+                        padding: 10px;
+                        border-bottom: 1px solid #eee;
+                        color: #000 !important;
+                    }
+                    .bill-table th {
+                        text-align: left;
+                        background-color: #f8f9fa;
+                        font-weight: 600;
+                        color: #000 !important;
+                    }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .bill-summary {
+                        margin-top: 20px;
+                        padding: 15px;
+                        background-color: #f8f9fa;
+                        border-radius: 8px;
+                        color: #000 !important;
+                    }
+                    .summary-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 8px;
+                        color: #000 !important;
+                    }
+                    .btn i {
+                        margin-right: 8px;
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    .fa-spinner {
+                        animation: spin 1s linear infinite;
+                        margin-right: 5px;
+                        display: inline-block;
+                    }
+                    .summary-row.total {
+                        margin-top: 15px;
+                        padding-top: 10px;
+                        border-top: 1px solid #ddd;
+                        font-weight: bold;
+                        font-size: 1.1em;
+                        color: #2c3e50;
+                    }
+                    .payment-info {
+                        margin-top: 20px;
+                        padding: 15px;
+                        background: #f0f4f8;
+                        border-radius: 6px;
+                        color: #000 !important;
+                        display: grid;
+                        gap: 10px;
+                    }
+                    .payment-method-display,
+                    .payment-status-display {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .payment-method {
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-weight: 500;
+                    }
+                    .payment-method.cash { background-color: #e3f2fd; color: #0d47a1; }
+                    .payment-method.upi { background-color: #e8f5e9; color: #1b5e20; }
+                    .payment-method.card { background-color: #f3e5f5; color: #4a148c; }
+                    .payment-method.other { background-color: #f5f5f5; color: #424242; }
+                    .payment-status {
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-weight: 500;
+                    }
+                    .payment-status.paid { background-color: #e8f5e9; color: #1b5e20; }
+                    .payment-status.pending { background-color: #fff8e1; color: #e65100; }
+                    
+                    /* Ensure all text in modal is visible */
+                    .modal-content * {
+                        color: #000 !important;
+                    }
+                    .payment-status {
+                        padding: 3px 8px;
+                        border-radius: 4px;
+                        font-size: 0.85em;
+                        font-weight: 500;
+                    }
+                    .payment-status.completed {
+                        background-color: #d4edda;
+                        color: #155724;
+                    }
+                    .payment-status.pending {
+                        background-color: #fff3cd;
+                        color: #856404;
+                    }
+                    .bill-type {
+                        display: inline-block;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 0.75em;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                    .bill-type.dine-in { background-color: #e3f2fd; color: #1565c0; }
+                    .bill-type.takeaway { background-color: #e8f5e9; color: #2e7d32; }
+                    .bill-type.delivery { background-color: #fff3e0; color: #e65100; }
+                </style>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        // Close bill modal
+        function closeBillModal() {
+            const modal = document.getElementById('billModal');
+            modal.style.display = 'none';
+            currentBill = null;
+        }
+
+        // Print the current bill with professional PDF generation
+        function printCurrentBill() {
+            if (!currentBill) return;
+            
+            // Format bill data for PDF generation
+            const billData = {
+                billNumber: currentBill.id || 'N/A',
+                billDate: new Date(currentBill.date).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                }),
+                customerName: currentBill.customerName || 'Customer',
+                mobileNumber: currentBill.phone || '',
+                tableNumber: currentBill.tableNumber || '',
+                items: currentBill.items || [],
+                subtotal: parseFloat(currentBill.subtotal) || 0,
+                cgstRate: parseFloat(currentBill.taxRate) / 2 || 0, 
+                sgstRate: parseFloat(currentBill.taxRate) / 2 || 0,
+                cgstAmount: (parseFloat(currentBill.taxAmount) / 2) || 0,
+                sgstAmount: (parseFloat(currentBill.taxAmount) / 2) || 0,
+                finalTotal: parseFloat(currentBill.totalAmount) || 0,
+                paymentStatus: currentBill.paymentStatus || 'pending',
+                paymentMethod: currentBill.paymentMethod || '',
+                restaurantName: document.querySelector('.restaurant-name')?.textContent || 'Restaurant'
+            };
+            
+            // Initialize PDF with modern settings
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                console.error('jsPDF not loaded properly');
+                alert('PDF generation library not loaded. Please refresh the page and try again.');
+                return;
+            }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Set default font
+            doc.setFont('helvetica');
+            
+            // Page dimensions
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 15;
+            const contentWidth = pageWidth - (margin * 2);
+            
+            // Add title
+            doc.setFontSize(24);
+            doc.setFont(undefined, 'bold');
+            doc.text('BILL RECEIPT', pageWidth / 2, 25, { align: 'center' });
+            
+            // Add title underline
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(margin, 30, pageWidth - margin, 30);
+            
+            // Add customer details
+            let y = 45;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.setDrawColor(100, 100, 100);
+            
+            // Bill info in two columns
+            doc.text(`Bill No: ${billData.billNumber}`, margin, y);
+            doc.text(`Date: ${billData.billDate}`, pageWidth - margin, y, { align: 'right' });
+            y += 7;
+            
+            doc.text(`Customer: ${billData.customerName}`, margin, y);
+            if (billData.mobileNumber) {
+                doc.text(`Mobile: +91-${billData.mobileNumber}`, margin, y + 7);
+            }
+            doc.text(`Table No: ${billData.tableNumber || 'N/A'}`, margin, y + 14);
+            
+            // Add items table header
+            y += 35;
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, y - 5, contentWidth, 10, 'F');
+            doc.setFont(undefined, 'bold');
+            doc.text('Item', margin + 2, y);
+            doc.text('Qty', margin + 100, y, { align: 'right' });
+            doc.text('R a t e (₹)', margin + 130, y, { align: 'right' });
+            doc.text('A m o u n t (₹)', margin + contentWidth - 2, y, { align: 'right' });
+            
+            // Add items
+            doc.setFont(undefined, 'normal');
+            y += 7;
+            billData.items.forEach(item => {
+                // Format numbers with proper decimal places
+                const rate = (item.price || 0).toFixed(2);
+                const amount = ((item.price || 0) * (item.quantity || 1)).toFixed(2);
+                
+                doc.text(item.name || 'Item', margin + 2, y);
+                doc.text((item.quantity || 0).toString(), margin + 100, y, { align: 'right' });
+                doc.text(rate, margin + 130, y, { align: 'right' });
+                doc.text(amount, margin + contentWidth - 2, y, { align: 'right' });
+                y += 7;
+            });
+            
+            // Add totals section
+            y += 10;
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 5;
+            
+            // Subtotal
+            doc.text('Subtotal:', margin + 100, y, { align: 'right' });
+            doc.text(billData.subtotal.toFixed(2), margin + contentWidth - 2, y, { align: 'right' });
+            y += 7;
+            
+            // CGST
+            doc.text(`CGST (${billData.cgstRate}%):`, margin + 100, y, { align: 'right' });
+            doc.text(billData.cgstAmount.toFixed(2), margin + contentWidth - 2, y, { align: 'right' });
+            y += 7;
+            
+            // SGST
+            doc.text(`SGST (${billData.sgstRate}%):`, margin + 100, y, { align: 'right' });
+            doc.text(billData.sgstAmount.toFixed(2), margin + contentWidth - 2, y, { align: 'right' });
+            y += 10;
+            
+            // Total line
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(150, 150, 150);
+            doc.line(margin + 100, y, pageWidth - margin, y);
+            y += 3;
+            
+            // Final Total
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(12);
+            doc.text('Final Total:', margin + 100, y, { align: 'right' });
+            // Fix the final amount display by ensuring it's a proper number
+            const finalTotalValue = typeof billData.finalTotal === 'number' ? billData.finalTotal : parseFloat(billData.finalTotal || 0);
+            // Format the final total properly without spaces between digits
+            const finalTotal = `₹${finalTotalValue.toFixed(2)}`;
+            doc.text(finalTotal, margin + contentWidth - 2, y, { align: 'right' });
+            
+            // Payment status
+            y += 10;
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(billData.paymentStatus === 'paid' ? 39 : 231, billData.paymentStatus === 'paid' ? 174 : 76, billData.paymentStatus === 'paid' ? 96 : 60);
+            doc.text(`STATUS: ${billData.paymentStatus.toUpperCase()}`, margin, y);
+            doc.setTextColor(0, 0, 0);
+            
+            // Footer
+            y = doc.internal.pageSize.getHeight() - 20;
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 5;
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'italic');
+            doc.text('Thank you for dining with us!', pageWidth / 2, y, { align: 'center' });
+            
+            // Add border around the page
+            doc.setDrawColor(220, 220, 220);
+            doc.rect(5, 5, pageWidth - 10, doc.internal.pageSize.getHeight() - 10);
+            
+            // Auto-print and open in new window
+            doc.autoPrint();
+            window.open(doc.output('bloburl'), '_blank');
+        }
+
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('billModal');
+            if (event.target === modal) {
+                closeBillModal();
+            }
+        };
+
+        // Print bill directly (for print button in list/grid view)
+        window.printBill = function(billId) {
+            openBillModal(billId);
+            // Small delay to ensure modal is open before printing
+            setTimeout(printCurrentBill, 100);
+        };
+        
+        // ===== Enhanced Export PDF feature =====
+        window.exportToPDF = function() {
+                if (!filteredOrders || filteredOrders.length === 0) {
+                    alert('No orders to export');
+                    return;
+                }
+                try {
+                    if (!window.jspdf || !window.jspdf.jsPDF) {
+                        console.error('jsPDF not loaded properly');
+                        alert('PDF generation library not loaded. Please refresh the page and try again.');
+                        return;
+                    }
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 10;
+                    let y = margin;
+
+                    /* Header */
+                    doc.setFillColor(108, 99, 255); // purple header
+                    doc.rect(0, 0, pageWidth, 20, 'F');
+                    doc.setFontSize(16);
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('ORDER HISTORY REPORT', pageWidth / 2, 12, { align: 'center' });
+
+                    /* Sub-header */
+                    y = 25;
+                    doc.setFontSize(11);
+                    doc.setTextColor(0, 0, 0);
+                    const now = new Date();
+                    const generatedOn = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+                    doc.text(`Generated on: ${generatedOn}`, margin, y);
+                    doc.text(`${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'}`, pageWidth - margin, y, { align: 'right' });
+                    y += 5;
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(margin, y, pageWidth - margin, y);
+                    y += 6;
+
+                    const lineGap = 4;
+
+                    /* Each order */
+                    filteredOrders.forEach(order => {
+                        if (y > pageHeight - 60) { doc.addPage(); y = margin; }
+
+                        // Card background
+                        doc.setFillColor(248, 248, 248);
+                        doc.setDrawColor(220, 220, 220);
+                        doc.roundedRect(margin, y, pageWidth - margin * 2, 10, 2, 2, 'FD');
+                        y += 6;
+
+                        doc.setFontSize(10);
+                        doc.setFont(undefined, 'bold');
+                        const leftX = margin + 2;
+                        const meta = [
+                            `Bill #: ${order.billNumber || (order.id ? 'BILL' + order.id.substring(0, 12) : 'N/A')}`,
+                            `Customer: ${order.customerName?.toLowerCase() || 'N/A'}`,
+                            `Table: ${order.tableNumber || 'N/A'}`,
+                            `Items: ${order.totalItems} ${order.totalItems === 1 ? 'item' : 'items'}`,
+                            `Type: ${order.paymentStatus === 'paid' ? 'paid' : 'pending'}`,
+                            `Payment: ${(order.paymentMethod || 'CASH').toUpperCase()}`,
+                            `Date & Time: ${new Date(order.date || order.billDate).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`
+                        ];
+                        meta.forEach(t => { doc.text(t, leftX, y); y += lineGap; });
+
+                        // Items header
+                        doc.setFont(undefined, 'bold');
+                        doc.text('Item', leftX, y);
+                        doc.text('Qty', leftX + 60, y, { align: 'right' });
+                        doc.text('Rate (₹)', leftX + 90, y, { align: 'right' });
+                        doc.text('Subtotal (₹)', leftX + 120, y, { align: 'right' });
+                        y += lineGap;
+                        doc.setFont(undefined, 'normal');
+
+                        order.items.forEach(item => {
+                            const unitPrice = item.price && parseFloat(item.price) > 0 ? parseFloat(item.price) : (order.subtotal / order.items.reduce((s, i) => s + parseFloat(i.quantity), 0));
+                            const sub = unitPrice * item.quantity;
+                            doc.text(item.menuItem?.name || item.name || 'Item', leftX, y);
+                            doc.text(String(item.quantity), leftX + 60, y, { align: 'right' });
+                            doc.text(unitPrice.toFixed(2), leftX + 90, y, { align: 'right' });
+                            doc.text(sub.toFixed(2), leftX + 120, y, { align: 'right' });
+                            y += lineGap;
+                        });
+
+                        // Taxes & totals
+                        y += 2;
+                        doc.line(leftX, y, pageWidth - margin - 2, y);
+                        y += lineGap;
+                        const cgst = order.cgst || (order.subtotal * 0.09);
+                        const sgst = order.sgst || (order.subtotal * 0.09);
+                        const finalTotal = order.totalAmount || order.total || (order.subtotal + cgst + sgst);
+                        const summary = [[`Subtotal:`, `₹${order.subtotal.toFixed(2)}`], [`CGST (9%):`, `₹${cgst.toFixed(2)}`], [`SGST (9%):`, `₹${sgst.toFixed(2)}`]];
+                        summary.forEach(([l, v]) => { doc.text(l, leftX, y); doc.text(v, pageWidth - margin - 2, y, { align: 'right' }); y += lineGap; });
+                        doc.line(leftX, y, pageWidth - margin - 2, y);
+                        y += lineGap;
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(0, 128, 0);
+                        doc.text('Final Total:', leftX, y);
+                        doc.text(`₹${finalTotal.toFixed(2)}`, pageWidth - margin - 2, y, { align: 'right' });
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont(undefined, 'normal');
+                        y += 10;
+                    });
+
+                    const fname = now.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\//g, '').replace(/, /g, '_').replace(/:/g, '');
+                    doc.save(`Order_History_Report_${fname}.pdf`);
+                } catch (err) {
+                    console.error('PDF export error', err);
+                    alert('Error generating PDF. Please try again.');
+                }
+            };
+    </script>
+    <!-- Export Handler -->
+    <script>
+        // Function to initialize exports after everything is loaded
+        function initializeExports() {
+            console.log('Initializing export functionality...');
+            
+            // Check if export functions are available
+            if (typeof exportToPDF === 'function' && typeof exportData === 'function') {
+                console.log('Export functions already available');
+                setupExportHandlers();
+                return;
+            }
+            
+            // If not, load the export handler
+            console.log('Loading export handler...');
+            const script = document.createElement('script');
+            script.src = 'export_handler.js';
+            script.onload = function() {
+                console.log('Export handler loaded successfully');
+                if (typeof setupExportHandlers === 'function') {
+                    setupExportHandlers();
+                }
+            };
+            script.onerror = function() {
+                console.error('Failed to load export handler');
+            };
+            document.body.appendChild(script);
+        }
+        
+        // Setup export button handlers
+        function setupExportHandlers() {
+            console.log('Setting up export handlers...');
+            
+            // Setup PDF export button
+            const pdfBtn = document.getElementById('exportPdfBtn');
+            if (pdfBtn) {
+                console.log('Found PDF export button');
+                pdfBtn.onclick = function() {
+                    if (typeof exportToPDF === 'function') {
+                        handleExport(pdfBtn, exportToPDF);
+                    } else {
+                        console.error('exportToPDF function not found');
+                        alert('Export functionality not loaded. Please refresh the page.');
+                    }
+                };
+            } else {
+                console.warn('PDF export button not found');
+            }
+            
+            // Setup CSV export button
+            const csvBtn = document.getElementById('exportBtn');
+            if (csvBtn) {
+                console.log('Found CSV export button');
+                csvBtn.onclick = function() {
+                    if (typeof exportData === 'function') {
+                        handleExport(csvBtn, exportData);
+                    } else {
+                        console.error('exportData function not found');
+                        alert('Export functionality not loaded. Please refresh the page.');
+                    }
+                };
+            } else {
+                console.warn('CSV export button not found');
+            }
+        }
+        
+        // Handle export button state
+        async function handleExport(button, exportFunction) {
+            if (button.getAttribute('data-exporting') === 'true') return;
+            
+            const originalHtml = button.innerHTML;
+            button.setAttribute('data-exporting', 'true');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+            
+            try {
+                await exportFunction();
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Export failed: ' + (error.message || 'Unknown error'));
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+                button.removeAttribute('data-exporting');
+            }
+        }
+        
+        // Start initialization when the page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeExports);
+        } else {
+            initializeExports();
+        }
+    </script>
+</body>
+</html>
