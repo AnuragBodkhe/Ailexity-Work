@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management | RECORDS - Restaurant Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+    <!-- Simple minimalist inline styles to match existing pages -->
+    <style>
+        body{font-family: "Segoe UI",Arial,sans-serif;background:#f4f6f9;margin:0;color:#333;}
+        a{text-decoration:none;color:inherit}
+        .container{max-width:1400px;margin:1.5rem auto;padding:0 1rem;}
+        h1{font-size:1.5rem;margin-bottom:0.5rem;color:#0056b3;}
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:1.5rem;}
+        .stat-card{background:#fff;border-radius:8px;padding:1rem;box-shadow:0 2px 4px rgba(0,0,0,.05);display:flex;flex-direction:column;align-items:flex-start;}
+        .stat-card .icon{font-size:1.75rem;color:#764ba2;margin-bottom:0.5rem;}
+        .stat-value{font-size:1.5rem;font-weight:600;margin-bottom:0.25rem;}
+        .search-wrapper{margin:1rem 0;}
+        .search-wrapper input{width:100%;padding:0.75rem;border:1px solid #e1e5eb;border-radius:6px;font-size:1rem;}
+        table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.05);}        
+        thead{background:#f1f3f7;}
+        th,td{padding:0.75rem 1rem;text-align:left;font-size:0.95rem;border-bottom:1px solid #f0f0f0;}
+        tbody tr:hover{background:#fafbfd;}
+        #noData{padding:2rem;text-align:center;color:#777;}
+        /* action buttons */
+        .action-btn{background:none;border:none;cursor:pointer;margin-right:6px;font-size:1rem;}
+        .action-btn.view{color:#17a2b8;}
+        .action-btn.edit{color:#ffc107;}
+        .action-btn.delete{color:#dc3545;}
+    </style>
+    <!-- New modern design overrides -->
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Segoe UI',Tahoma, Geneva, Verdana, sans-serif;background:#f5f7fa;min-height:100vh;color:#333;}
+        .header{text-align:center;margin-bottom:3rem;color:#121139;}
+        .header h1{font-size:2.5rem;margin-bottom:0.5rem;text-shadow:2px 2px 4px rgba(0,0,0,.3);} 
+        .header p{font-size:1.1rem;opacity:.9;}
+        .container{max-width:1400px;margin:0 auto;padding:2rem 1rem;}
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem;margin-bottom:3rem;}
+        .stat-card{background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 4px 12px rgba(0,0,0,.05);transition:transform .2s ease;display:flex;flex-direction:column;align-items:flex-start;}
+        .stat-card:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,.08);}
+        .stat-card .icon{font-size:2.5rem;margin-bottom:1rem;background:#3f51b5;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .stat-value{font-size:2rem;font-weight:700;margin-bottom:.5rem;color:#333;}
+        .stat-label{font-size:.9rem;color:#666;text-transform:uppercase;letter-spacing:.5px;}
+        .main-content{background:#fff;border-radius:12px;padding:2rem;box-shadow:0 4px 16px rgba(0,0,0,.06);}
+        .search-section{margin-bottom:2rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;}
+        .search-wrapper{position:relative;max-width:400px;}
+        .search-wrapper input{width:100%;padding:.9rem 1rem .9rem 2.8rem;border:1px solid #d6d9e0;border-radius:24px;font-size:1rem;transition:border-color .2s ease;background:#fff;}
+        .search-wrapper input:focus{outline:none;border-color:#3f51b5;box-shadow:0 0 0 2px rgba(63,81,181,.15);} 
+        .search-wrapper i{position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:#666;font-size:1.1rem;}
+        .table-container{overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.05);} 
+        thead{background:#3f51b5;color:#fff;}
+        th{padding:1.2rem 1rem;text-align:left;font-weight:600;font-size:.9rem;text-transform:uppercase;letter-spacing:.5px;}
+        td{padding:1rem;border-bottom:1px solid #f0f0f0;font-size:.95rem;}
+        tbody tr:hover{background:#f8f9ff;}
+        tbody tr:last-child td{border-bottom:none;}
+        .action-btn{background:none;border:none;cursor:pointer;margin-right:.5rem;font-size:1.1rem;padding:.5rem;border-radius:8px;transition:all .2s ease;}
+        .action-btn:hover{background:rgba(0,0,0,.05);} 
+        .action-btn.view{color:#17a2b8;}.action-btn.edit{color:#ffc107;}.action-btn.delete{color:#dc3545;}
+        .action-btn.view:hover{background:rgba(23,162,184,.1);} .action-btn.edit:hover{background:rgba(255,193,7,.1);} .action-btn.delete:hover{background:rgba(220,53,69,.1);} 
+        #noData{text-align:center;color:#666;font-style:italic;padding:3rem;}
+        @media(max-width:768px){.container{padding:1rem;}.header h1{font-size:2rem;}.stats{grid-template-columns:1fr;gap:1rem;}.stat-card{padding:1.5rem;}.main-content{padding:1.5rem;}.search-wrapper{max-width:100%;}table{font-size:.85rem;}th,td{padding:.75rem .5rem;}.action-btn{font-size:1rem;margin-right:.25rem;}}
+        .topbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;background:#ffffff;padding:.8rem 2rem;box-shadow:0 2px 6px rgba(0,0,0,.06);z-index:1000;}
+        .brand{font-weight:700;font-size:1.1rem;color:#3f51b5;letter-spacing:.5px;}
+        .nav-links a{display:inline-block;margin-left:1.2rem;padding:.45rem 1.1rem;border-radius:22px;font-size:.9rem;font-weight:600;color:#3f51b5;text-decoration:none;transition:background .2s,color .2s;}
+        .nav-links a:hover{background:#3f51b5;color:#fff;}
+        .nav-links a.active{background:#3f51b5;color:#fff;}
+
+        /* export buttons */
+        .export-buttons{display:flex;gap:.6rem;align-self:flex-start;}
+
+        /* modal */
+        .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:999;}
+        .modal-window{background:#fff;border-radius:12px;max-width:420px;width:90%;padding:1.5rem;box-shadow:0 4px 24px rgba(0,0,0,.15);animation:fadeIn .3s ease;}
+        .modal-header{font-weight:600;font-size:1.2rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;}
+        .modal-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:#666;}
+        .modal-actions{margin-top:1.5rem;text-align:right;}
+        .btn{padding:.6rem 1rem;border:none;border-radius:6px;font-size:.9rem;cursor:pointer;}
+        .btn.primary{background:#667eea;color:#fff;}
+        .btn.danger{background:#dc3545;color:#fff;}
+        .btn.secondary{background:#e1e5eb;color:#333;}
+        @keyframes fadeIn{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="topbar">
+        <div class="brand">RECORDS</div>
+        <div class="nav-links">
+            <a href="history.html">History</a>
+            <a href="billing.html">Billing</a>
+            <a href="customers.html" class="active">Customers</a>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-users"></i> Customer Management</h1>
+            <p>Manage your restaurant's customer database</p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats">
+            <div class="stat-card">
+                <span class="icon"><i class="fas fa-users"></i></span>
+                <span class="stat-value" id="totalCustomers">0</span>
+                <small>Total Customers</small>
+            </div>
+            <div class="stat-card">
+                <span class="icon"><i class="fas fa-user-plus"></i></span>
+                <span class="stat-value" id="newCustomers">0</span>
+                <small>New (7 days)</small>
+            </div>
+            <div class="stat-card">
+                <span class="icon"><i class="fas fa-calendar-alt"></i></span>
+                <span class="stat-value" id="monthCustomers">0</span>
+                <small>This Month</small>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search customers by name or phone..."/>
+                </div>
+            <div class="export-buttons" style="text-align:right;margin-top:.8rem;">
+                    <button id="exportCustCsv" class="btn secondary"><i class="fas fa-file-csv"></i> Export CSV</button>
+                    <button id="exportCustPdf" class="btn primary"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                </div>
+            </div> <!-- end search-section -->
+
+        <!-- Customers Table -->
+        <div class="table-container">
+                    <table id="customersTable">
+            <thead>
+                <tr>
+                    <th>Customer ID</th>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr id="noData"><td colspan="4">Loading...</td></tr>
+            </tbody>
+        </table>
+                </div>
+            </div> <!-- end main-content -->
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-Yt3Fh035GHrRkNvztNFVQVw1Gc7YCOUMIqFZ3VAbAV/TSEuxsjjXNMTvEihQ/HUkNzxaz2QmiVjCwRKzqIrDrA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="customers.js"></script>
+    <!-- modal overlay -->
+    <div id="modalOverlay" class="modal-overlay hidden" style="display:none;">
+        <div class="modal-window"></div>
+    </div>
+
+    </body>
+</html>
